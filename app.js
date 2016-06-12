@@ -9,9 +9,8 @@ var session = require('express-session');
 
 var routes = require('./routes');
 var users = require('./routes/user');
-
+//var viewUser = require('./routes/viewUser');
 var app = express();
-
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'jade');
@@ -67,7 +66,7 @@ app.use(function(err, req, res, next) {
         error: {}
     });
 });
-
+/* setting up mysql connection */
 var mysql      = require('mysql');
 var connection = mysql.createConnection({
   host     : 'localhost',
@@ -77,26 +76,89 @@ var connection = mysql.createConnection({
 });
 
 connection.connect();
-
+/*session variable */
 var user_ses;
+/*register function*/
 
+app.post('/registerUser',function(req,res){
+
+  var firstname = req.body.fname;
+  var lastname = req.body.lname;
+  var address = req.body.address;
+  var city = req.body.city;
+  var state = req.body.state;
+  var zip = req.body.zip;
+  var email = req.body.email;
+  var username = req.body.username;
+  var password = req.body.password;
+  var flag = 0;
+  var atpos ;
+  var dotpos ;
+  
+  if(email != null || email != ""){
+  var atpos = email.indexOf("@");
+  var dotpos = email.lastIndexOf(".");
+  if (atpos<1 || dotpos<atpos+2 || dotpos+2>=email.length){
+  flag =1 ;
+  }
+  else{
+  flag = 0;
+  }
+}
+  
+  if (firstname == "" || lastname == "" || address == "" || city == "" ||state == "" || zip == "" || email == "" || username == "" || password == "" ) {
+   res.json({"message" :"There was a problem with this action"});
+  }
+  else if ((zip.length != 5 ) || (flag = 0)) {
+  
+  res.json({"message" :"There was a problem with this action"});
+  }
+  else {
+  
+  var type = "customer";
+  
+  var data = {
+	    firstname: firstname,
+		lastname: lastname,
+		address: address,
+		city: city,
+		state: state,
+		zip: zip,
+		email: email,
+		username: username,
+		password: password,
+		type: type,    
+    };
+    connection.query('INSERT INTO users set ? ',data,function(err,rows) {            
+		    if(err) {
+		      res.json({"message":"There was a problem with this action"});
+		    }
+		    else {
+		      res.json({"message":"Your account has been registered"});	
+		    }
+  		});
+  } 
+});
+
+/*login function*/
 app.post('/login', function(req, res) {
     var username = req.body.username;
     var password = req.body.password;
     
     
     if(username == "" || password == "" || typeof username == 'undefined' || typeof password == 'undefined'){
-      res.json({"error":"Please enter username and password"});
+      res.json({"message":"Please enter username and password"});
     }
     else{
     
     connection.query('SELECT * FROM users WHERE username = ?  AND password = ?',[username,password],function(err,rows){
     	  if(err){
-    		  res.json({"error":"There seems to be an issue with the username/password combination that you entered"});
+    		  res.json({"message":"That username and password combination was not correct"});
     	  }
     	  if(rows.length > 0){
     	  user_ses = req.session;
     	        user_ses.user = username;
+    	        user_ses.type = rows[0].type;
                 user_ses.status = "logged in";
                 var id = req.sessionID;
                 var name = rows[0].firstname;
@@ -112,33 +174,383 @@ app.post('/login', function(req, res) {
     	  }
     	  else{
     		  
-    	        res.json({"error":"There seems to be an issue with the username/password combination that you entered"});
+    	        res.json({"message":"That username and password combination was not correct"});
     	  }
       });
     }
 
 });
-
+/* logout function */
   app.post('/logout', function(req, res) {
   user_ses = req.session;
   var id = req.sessionID;
   var username = user_ses.user;
+
   
   connection.query('SELECT * FROM users WHERE sessionid = ?',[id],function(err,rows) {            
       if(err) {
         
-        res.json({"message":"You are not currently logged in" +id});
+        res.json({"message":"You are not currently logged in"});
       }
       if(rows.length > 0) {
         user_ses.destroy();
-        res.json({"success":"You have been  succesfully logged out" +id});
+        res.json({"message":"You have been logged out"});
       }
       else {
         res.json({"message":"You are not currently logged in"});
       } 
     });
   });
+/*update contact information*/
+app.post('/updateInfo', function(req, res) {
+	
+
+	var firstname = req.body.fname;
+	var lastname = req.body.lname;
+	var address = req.body.address;
+	var city = req.body.city;
+	var state = req.body.state;
+	var zip = req.body.zip;
+	var email = req.body.email;
+	var username = req.body.username;
+	var password = req.body.password;
+	var flag = 0;
+	var sessid;
+	var query = "UPDATE users SET";
+
+    if(typeof firstname != 'undefined' && firstname != "") {
+		query += " firstname= '"+firstname+"',";
+	}
+
+	if(typeof lastname != 'undefined' && lastname != "") {
+		query += " lastname= '"+lastname+"',";
+	}
+
+	if(typeof address != 'undefined' && address != "") {
+		query += " address= '"+address+"',";
+	}
+
+	if(typeof city != 'undefined' && city != "") {
+		query += " city= '"+city+"',";
+	}
+
+	if(typeof state != 'undefined' && state != "") {
+		
+		query += " state= '"+state+"',";
+	}
+
+	if(typeof zip != 'undefined' && zip != "") {
+		if(zip.length != 5) {
+			flag = 1;
+		}
+		query += " zip= '"+zip+"',";
+	}
+
+	if(typeof email != 'undefined' && email != "") {
+	    var atpos = email.indexOf("@");
+        var dotpos = email.lastIndexOf(".");
+        if (atpos<1 || dotpos<atpos+2 || dotpos+2>=email.length){
+         flag =1 ;
+        }
+		query += " email= '"+email+"',";
+	}
+
+	if(typeof username != 'undefined' && username != "") {
+		query += " username= '"+username+"',";
+	}
+
+	if(typeof password != 'undefined' && password != "") {
+		query += " password= '"+password+"',";
+	}
+	
+	user_ses = req.session;
+    var id = req.sessionID;
+
+  	connection.query('SELECT * FROM users where sessionid = ?',[id],function(err,rows) {            
+      if(err) {
+        res.json({"message":"There was a problem with this action"});
+      }
+      else{
+      if(rows.length > 0) {
+      	sessid = rows[0].sessionid;
+      	var updateQuery = query.substring(0,query.length-1);
+      	updateQuery = updateQuery+ " WHERE sessionid='"+sessid+"'";
+	    if (flag == 0) {
+			connection.query(updateQuery,function(err,rows) {            
+	    if(err) {
+	      res.json({"message":"There was a problem with this action"});
+	    }
+	    else {
+	      res.json({"message":"Your information has been updated"});
+	    }     
+  	});
+		}
+		else {
+		    res.json({"message":"There was a problem with this action"});
+		}
+      }
+      else {
+      	res.json({"message":"You must be logged in to perform this action"});
+      }
+    }
+  	});
+});
+/*add product*/
+
+app.post('/addProducts',function(req,res){
+
+var productid = req.body.productId;
+var name = req.body.name;
+var description = req.body.productDescription;
+var group = req.body.group;
+
+  user_ses = req.session;
+  var id = req.sessionID;
+  var username = user_ses.user;
+  var type = user_ses.type;
   
+  if(user_ses.user) {
+  
+  if(type == 'admin'){
+  
+  if(productid == "" || name == "" || description == "" || group == "" || typeof productid == 'undefined' || typeof name == 'undefined' || typeof description == 'undefined' || typeof group == 'undefined'){
+  
+  res.json({"message":"There was a problem with this action"});
+  
+  }
+  else{
+  var data = {
+	    productid: productid,
+		name: name,
+		description: description,
+		product_group: group,
+		
+    };
+    connection.query('INSERT INTO products set ? ',data,function(err,rows) {            
+		    if(err) {
+		      res.json({"message":"There was a problem with this action"});
+		    }
+		    else {
+		      res.json({"message":"The product has been added to the system"});	
+		    }
+  		});
+   
+  }
+  }
+  else{
+   res.json({"message":"Only admin can perform this action"});
+  }
+}
+else{
+res.json({"message":"You must be logged in to perform this action"});
+}
+
+});
+/* modify product */
+ 
+ app.post('/modifyProduct',function(req,res){
+  var productid = req.body.productId;
+  var description = req.body.productDescription;
+  var name = req.body.name;
+  
+  
+  user_ses = req.session;
+  var id = req.sessionID;
+  var username = user_ses.user;
+  var type = user_ses.type;
+  
+  if(user_ses.user) {
+  
+  if(type == 'admin'){
+  
+  if(productid == "" || name == "" || description == ""  || typeof productid == 'undefined' || typeof name == 'undefined' || typeof description == 'undefined'){
+  
+  res.json({"message":"There was a problem with this action"});
+  
+  }
+  else{
+  
+  connection.query ('SELECT * FROM products WHERE productid = ?',[productid],function(err,rows){
+  
+  if (err){
+  
+  res.json({"message":"There was a problem with this action"});
+  }
+  else{
+      if(rows.length > 0){
+      connection.query('UPDATE products SET name = ? , description = ? WHERE productid = ?',[name,description,productid],function(err,rows) {            
+		    if(err) {
+		      res.json({"message":"There was a problem with this action"});
+		    }
+		    else {
+		      res.json({"message":"The product information has been updated"});	
+		    }
+  		});
+      }
+      
+    else{
+    res.json({"message":"There was a problem with this action"});
+    }
+  }
+  
+  });
+   
+  }
+  }
+  else{
+   res.json({"message":"Only admin can perform this action"});
+  }
+}
+else{
+res.json({"message":"You must be logged in to perform this action"});
+}
+
+});
+  
+/*view users*/
+app.post('/viewUsers',function(req,res){
+
+var fname = req.body.fname;
+var lname = req.body.lname;
+
+user_ses = req.session;
+  var id = req.sessionID;
+  var username = user_ses.user;
+  var type = user_ses.type;
+  
+  if(user_ses.user) {
+  
+  if(type == 'admin'){
+  
+  if(fname == '' && lname == ''){
+  
+  //var query = "SELECT CONCAT_WS(' ',firstname,lastname) AS 'name' FROM users";
+  
+  var query = "SELECT firstname AS 'fname',lastname AS 'lname' FROM users";
+  
+  //connection.query('SELECT firstname,lastname FROM users ', function(err,rows){
+  
+  connection.query(query, function(err,rows){
+  if(err){
+  res.json({"message":"There was an problem with this action"});
+  }
+  else{
+  
+  if(rows.length > 0){
+  
+  /*var names = [];
+     for (var i = 0;i < rows.length; i++) {
+        //names.push(rows[i].firstname + " " + rows[i].lastname);
+        names.push({name:rows[i].firstname + " " + rows[i].lastname});
+}*/
+  
+  res.json({"user_list": rows});
+
+  
+  }
+  else{
+  res.json({"message":"There was a problem with this action"});
+  }
+  
+  }
+  
+  });
+  
+  }
+  else{
+     var query = "SELECT firstname AS 'fname',lastname AS 'lname' FROM users WHERE firstname LIKE '%"+fname+"%' AND lastname LIKE '%"+lname+"%'";
+    //connection.query('SELECT firstname,lastname FROM users WHERE firstname LIKE %?% AND lastname LIKE %?% ',[fname.lname],function(err,rows) { 
+     connection.query(query,function(err,rows) {            
+		    
+		    if(err) {
+		      res.json({"message":"There was a problem with this action"});
+		    }
+		    else {
+		    if(rows.length > 0){
+		    
+		    res.json({"user_list":rows});	
+		    
+		    }
+		    else{
+		    res.json({"message":"There was a problem with this action"});
+		    }
+		      
+		    }
+  		});
+   
+  }
+  }
+  else{
+   res.json({"message":"Only admin can perform this action"});
+  }
+}
+else{
+res.json({"message":"You must be logged in to perform this action"});
+}
+
+});
+
+/*view products*/
+app.post('/viewProducts',function(req,res){
+
+var productid = req.body.productId;
+var group = req.body.group;
+var keyword = req.body.keyword;
+var flag = 0;
+
+
+var query = "SELECT name FROM products ";
+
+if(typeof productid != 'undefined' && productid != ''){
+
+query = query + "WHERE productid ="+productid+"";
+flag = 1;
+
+}
+
+if (typeof group != 'undefined' && group != ''){
+if (flag == 1){
+
+query = query + " AND product_group LIKE '%"+group+"%'";
+
+}
+else{
+query = query + "WHERE product_group LIKE '%"+group+"%'";
+flag = 1;
+}
+
+}
+if(typeof keyword != 'undefined' && keyword != ''){
+if (flag == 1){
+
+query = query + " AND description LIKE '%"+keyword+"%' OR name LIKE '%"+keyword+"%'";
+
+}
+else{
+query = query + "WHERE description LIKE '%"+keyword+"%' OR name LIKE '%"+keyword+"%'";
+}
+}
+
+connection.query(query,function(err,rows) {            
+		    
+		    if(err) {
+		      res.json({"message":"There were no products in the system that met that criteria"});
+		    }
+		    else {
+		    if(rows.length > 0){
+		    
+		    res.json({"product_list":rows});	
+		    
+		    }
+		    else{
+		    res.json({"message":"There were no products in the system that met that criteria"});
+		    }
+		      
+		    }
+  		});
+});
+
+ /* add function */ 
   app.post('/add',function(req,res){
   
   user_ses = req.session;
@@ -158,7 +570,7 @@ app.post('/login', function(req, res) {
   res.json({"message":"You must be logged in before acccesing this function"});
   }
   
-  
+/* multiply function */  
   });
   app.post('/multiply',function(req,res){
   
@@ -180,7 +592,8 @@ app.post('/login', function(req, res) {
   }
   
   });
-
+   
+/*divide function */
 app.post('/divide',function(req,res){
   
   user_ses = req.session;
