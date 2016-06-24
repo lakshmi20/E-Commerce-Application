@@ -6,6 +6,7 @@ var logger = require('morgan');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 var session = require('express-session');
+var sess_store = require('express-mysql-session');
 
 var routes = require('./routes');
 var users = require('./routes/user');
@@ -15,9 +16,24 @@ var app = express();
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'jade');
 
+var storeOptions = {
+
+ host     : 'localhost',
+ user     : 'root',
+ password : 'root',
+ database : 'ediss'
+ 
+ /*host     : 'ediss.chxt7fnltnys.us-east-1.rds.amazonaws.com',
+ user     : 'lakshmis',
+ password : 'Anansat123.',
+ database : 'ediss'*/
+
+};
+
 app.use(favicon());
 app.use(logger('dev'));
 app.use(session({
+      store: new sess_store(storeOptions),
       secret: 'meera', 
       saveUninitialized: true, 
       resave: true, 
@@ -68,14 +84,15 @@ app.use(function(err, req, res, next) {
 });
 /* setting up mysql connection */
 var mysql      = require('mysql');
-var connection = mysql.createConnection({
+/*var connection = mysql.createConnection({
   host     : 'localhost',
   user     : 'root',
   password : 'root',
   database : 'ediss'
-});
+});*/
 
-connection.connect();
+var pool = mysql.createPool(storeOptions);
+//connection.connect();
 /*session variable */
 var user_ses;
 /*register function*/
@@ -129,6 +146,7 @@ app.post('/registerUser',function(req,res){
 		password: password,
 		type: type,    
     };
+    pool.getConnection(function(err,connection) {
     connection.query('INSERT INTO users set ? ',data,function(err,rows) {            
 		    if(err) {
 		      res.json({"message":"There was a problem with this action"});
@@ -136,6 +154,8 @@ app.post('/registerUser',function(req,res){
 		    else {
 		      res.json({"message":"Your account has been registered"});	
 		    }
+  		});
+  		connection.release();
   		});
   } 
 });
@@ -150,7 +170,7 @@ app.post('/login', function(req, res) {
       res.json({"message":"Please enter username and password"});
     }
     else{
-    
+    pool.getConnection(function(err,connection) {
     connection.query('SELECT * FROM users WHERE username = ?  AND password = ?',[username,password],function(err,rows){
     	  if(err){
     		  res.json({"message":"That username and password combination was not correct"});
@@ -176,6 +196,8 @@ app.post('/login', function(req, res) {
     		  
     	        res.json({"message":"That username and password combination was not correct"});
     	  }
+      });
+      connection.release();
       });
     }
 
@@ -291,6 +313,7 @@ app.post('/updateInfo', function(req, res) {
       	//updateQuery = updateQuery+ " WHERE sessionid='"+sessid+"'";
       	updateQuery = updateQuery+ " WHERE username='"+username+"'";
 	    if (flag == 0) {
+	        pool.getConnection(function(err,connection) {
 			connection.query(updateQuery,function(err,rows) {            
 	    if(err) {
 	      res.json({"message":"There was a problem with this action"});
@@ -298,6 +321,8 @@ app.post('/updateInfo', function(req, res) {
 	    else {
 	      res.json({"message":"Your information has been updated"});
 	    }     
+  	});
+  	connection.release();
   	});
 		}
 		else {
@@ -341,6 +366,7 @@ var group = req.body.group;
 		product_group: group,
 		
     };
+    pool.getConnection(function(err,connection) {
     connection.query('INSERT INTO products set ? ',data,function(err,rows) {            
 		    if(err) {
 		      res.json({"message":"There was a problem with this action"});
@@ -349,7 +375,8 @@ var group = req.body.group;
 		      res.json({"message":"The product has been added to the system"});	
 		    }
   		});
-   
+    connection.release();
+    });
   }
   }
   else{
@@ -384,7 +411,7 @@ res.json({"message":"You must be logged in to perform this action"});
   
   }
   else{
-  
+  pool.getConnection(function(err,connection) {
   connection.query ('SELECT * FROM products WHERE productid = ?',[productid],function(err,rows){
   
   if (err){
@@ -408,6 +435,8 @@ res.json({"message":"You must be logged in to perform this action"});
     }
   }
   
+  });
+  connection.release();
   });
    
   }
@@ -444,7 +473,7 @@ user_ses = req.session;
   var query = "SELECT firstname AS 'fname',lastname AS 'lname' FROM users";
   
   //connection.query('SELECT firstname,lastname FROM users ', function(err,rows){
-  
+  pool.getConnection(function(err,connection) {
   connection.query(query, function(err,rows){
   if(err){
   res.json({"message":"There was an problem with this action"});
@@ -470,11 +499,14 @@ user_ses = req.session;
   }
   
   });
+  connection.release();
+  });
   
   }
   else{
      var query = "SELECT firstname AS 'fname',lastname AS 'lname' FROM users WHERE firstname LIKE '%"+fname+"%' AND lastname LIKE '%"+lname+"%'";
     //connection.query('SELECT firstname,lastname FROM users WHERE firstname LIKE %?% AND lastname LIKE %?% ',[fname.lname],function(err,rows) { 
+    pool.getConnection(function(err,connection) {
      connection.query(query,function(err,rows) {            
 		    
 		    if(err) {
@@ -491,6 +523,8 @@ user_ses = req.session;
 		    }
 		      
 		    }
+  		});
+  		connection.release();
   		});
    
   }
@@ -545,7 +579,7 @@ else{
 query = query + "WHERE description LIKE '%"+keyword+"%' OR name LIKE '%"+keyword+"%'";
 }
 }
-
+pool.getConnection(function(err,connection) {
 connection.query(query,function(err,rows) {            
 		    
 		    if(err) {
@@ -562,6 +596,9 @@ connection.query(query,function(err,rows) {
 		    }
 		      
 		    }
+  		});
+  		
+  		connection.release();
   		});
 });
 
