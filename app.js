@@ -185,9 +185,20 @@ app.post('/login', function(req, res) {
   user_ses = req.session;
   var id = req.sessionID;
   var username = user_ses.user;
+  
+  if(username) {
+  
+        user_ses.destroy();
+        
+        res.json({"message":"You have been logged out"});
+  }
+  
+  else{
+  res.json({"message":"You are not currently logged in"});
+  }
 
   
-  connection.query('SELECT * FROM users WHERE sessionid = ?',[id],function(err,rows) {            
+  /*connection.query('SELECT * FROM users WHERE sessionid = ?',[id],function(err,rows) {            
       if(err) {
         
         res.json({"message":"You are not currently logged in"});
@@ -199,7 +210,7 @@ app.post('/login', function(req, res) {
       else {
         res.json({"message":"You are not currently logged in"});
       } 
-    });
+    });*/
   });
 /*update contact information*/
 app.post('/updateInfo', function(req, res) {
@@ -265,16 +276,20 @@ app.post('/updateInfo', function(req, res) {
 	
 	user_ses = req.session;
     var id = req.sessionID;
-
-  	connection.query('SELECT * FROM users where sessionid = ?',[id],function(err,rows) {            
+    var username = user_ses.user;
+    
+    if(username) {
+    
+  	/*connection.query('SELECT * FROM users where sessionid = ?',[id],function(err,rows) {            
       if(err) {
         res.json({"message":"There was a problem with this action"});
       }
-      else{
-      if(rows.length > 0) {
-      	sessid = rows[0].sessionid;
+      else{*/
+      //if(rows.length > 0) {
+      	//sessid = rows[0].sessionid;
       	var updateQuery = query.substring(0,query.length-1);
-      	updateQuery = updateQuery+ " WHERE sessionid='"+sessid+"'";
+      	//updateQuery = updateQuery+ " WHERE sessionid='"+sessid+"'";
+      	updateQuery = updateQuery+ " WHERE username='"+username+"'";
 	    if (flag == 0) {
 			connection.query(updateQuery,function(err,rows) {            
 	    if(err) {
@@ -292,8 +307,8 @@ app.post('/updateInfo', function(req, res) {
       else {
       	res.json({"message":"You must be logged in to perform this action"});
       }
-    }
-  	});
+    //}
+  	//});
 });
 /*add product*/
 
