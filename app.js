@@ -339,8 +339,9 @@ app.post('/updateInfo', function(req, res) {
 
 app.post('/addProducts',function(req,res){
 
-var productid = req.body.productId;
+//var productid = req.body.productId;
 var name = req.body.name;
+var asin = req.body.asin;
 var description = req.body.productDescription;
 var group = req.body.group;
 
@@ -353,17 +354,18 @@ var group = req.body.group;
   
   if(type == 'admin'){
   
-  if(productid == "" || name == "" || description == "" || group == "" || typeof productid == 'undefined' || typeof name == 'undefined' || typeof description == 'undefined' || typeof group == 'undefined'){
+  if(asin == "" || name == "" || description == "" || group == "" || typeof asin == 'undefined' || typeof name == 'undefined' || typeof description == 'undefined' || typeof group == 'undefined'){
   
   res.json({"message":"There was a problem with this action"});
   
   }
   else{
   var data = {
-	    productid: productid,
+	    //productid: productid,
+	    asin: asin,
 		name: name,
 		description: description,
-		product_group: group,
+		category: group,
 		
     };
     pool.getConnection(function(err,connection) {
@@ -391,7 +393,7 @@ res.json({"message":"You must be logged in to perform this action"});
 /* modify product */
  
  app.post('/modifyProduct',function(req,res){
-  var productid = req.body.productId;
+  var asin = req.body.asin;
   var description = req.body.productDescription;
   var name = req.body.name;
   
@@ -405,14 +407,14 @@ res.json({"message":"You must be logged in to perform this action"});
   
   if(type == 'admin'){
   
-  if(productid == "" || name == "" || description == ""  || typeof productid == 'undefined' || typeof name == 'undefined' || typeof description == 'undefined'){
+  if(asin == "" || name == "" || description == ""  || typeof asin == 'undefined' || typeof name == 'undefined' || typeof description == 'undefined'){
   
   res.json({"message":"There was a problem with this action"});
   
   }
   else{
   pool.getConnection(function(err,connection) {
-  connection.query ('SELECT * FROM products WHERE productid = ?',[productid],function(err,rows){
+  connection.query ('SELECT * FROM products WHERE asin = ?',[asin],function(err,rows){
   
   if (err){
   
@@ -420,7 +422,7 @@ res.json({"message":"You must be logged in to perform this action"});
   }
   else{
       if(rows.length > 0){
-      connection.query('UPDATE products SET name = ? , description = ? WHERE productid = ?',[name,description,productid],function(err,rows) {            
+      connection.query('UPDATE products SET name = ? , description = ? WHERE asin = ?',[name,description,asin],function(err,rows) {            
 		    if(err) {
 		      res.json({"message":"There was a problem with this action"});
 		    }
@@ -542,20 +544,41 @@ res.json({"message":"You must be logged in to perform this action"});
 /*view products*/
 app.post('/viewProducts',function(req,res){
 
-var productid = req.body.productId;
+//var productid = req.body.productId;
+var asin = req.body.asin;
 var group = req.body.group;
 var keyword = req.body.keyword;
 var flag = 0;
 
+ var query;
+    if ((typeof asin != 'undefined' && asin != "")) {
+    
+        query = "SELECT name FROM products WHERE asin =" + asin + " limit 1000";
+        
+    } else if (typeof group != 'undefined' && group != "") {
+    
+        query = "SELECT name FROM products  WHERE MATCH (category) AGAINST ('" + group + "' IN BOOLEAN MODE) limit 1000";
+        
+    } else if (typeof keyword != 'undefined' && keyword != "") {
+    
+        query = "SELECT name FROM products WHERE MATCH (name,description) AGAINST ('" + keyword + "' IN BOOLEAN MODE) limit 1000";
+        
+    } else {
+    
+        query = "SELECT name FROM products limit 1000";
+    }
 
-var query = "SELECT name FROM products ";
 
-if(typeof productid != 'undefined' && productid != ''){
+/*var query = "SELECT name FROM products ";
 
-query = query + "WHERE productid ="+productid+"";
+if(typeof asin != 'undefined' && asin != ''){
+
+query = query + "WHERE asin ="+asin+"";
 flag = 1;
 
 }
+
+
 
 if (typeof group != 'undefined' && group != ''){
 if (flag == 1){
@@ -579,6 +602,7 @@ else{
 query = query + "WHERE description LIKE '%"+keyword+"%' OR name LIKE '%"+keyword+"%'";
 }
 }
+query = query + "LIMIT 1000";*/
 pool.getConnection(function(err,connection) {
 connection.query(query,function(err,rows) {            
 		    
@@ -601,6 +625,313 @@ connection.query(query,function(err,rows) {
   		connection.release();
   		});
 });
+
+/* buy product */
+
+app.post('/buyProducts',function(req,res){
+
+var asin_input = req.body.asin;
+
+  user_ses = req.session;
+  var id = req.sessionID;
+  var username = user_ses.user;
+  var type = user_ses.type;
+  //var stock_available;
+  
+  asin_input = asin_input.replace('[', '');
+  
+  asin_input = asin_input.replace(']', '');
+  
+  asin_input = asin_input.split(",");
+  
+  //var query = "SELECT * FROM product_inventory_information WHERE";
+  
+  //if(typeof asin_input != 'undefined' && asin_input != "") {
+		//query += " asin= '"+asin_input+"',";
+//	}
+  
+  var query1 = "INSERT into `orders` (`username`, `asin_product`) values ";
+  
+        var value  =  "";
+
+        asin_input.forEach(function(asin) {
+
+             value += "(\'" + username + "\',\'" + asin + "\'),";
+        });
+
+        value = value.substring(0, value.length - 1);
+        
+        val  += ";";
+
+        var queryfinal = query1 + value;
+
+	//var finalQuery = query.substring(0,query.length-1);
+	
+	 //console.log(finalQuery);
+	 
+	 //if(typeof username != 'undefined'){
+	 
+	// connection.beginTransaction(function(err) {
+	 
+	 pool.getConnection(function (err, connection) {
+	 
+        connection.query(queryfinal, function (err,rows) {
+        
+        if (!err) {
+                    
+          asin_input.forEach(function(asin) {
+
+           var query_reco = "SELECT asin_product from recommendations where asin = \'" + asin + "\';";
+
+           pool.getConnection(function (err, connection) {
+           
+           connection.query(query_reco, function (err,rows_reco) {
+
+            if (!err) {
+                    
+                var value = "";
+                
+                if (!rows_reco[0] === undefined) {
+                
+                    value = rows_reco[0].asin_product;
+                                    
+                    }
+
+                    asin_input.forEach(function(row) {
+                    
+                        value +=  row + ",";
+                        
+                    });
+
+                    value = value.substring(0, value.length - 1);
+                    
+                    var query_reco1 = "REPLACE into recommendations VALUES (\'" + asin + "\',\'" + value + "\');";
+
+                    pool.getConnection(function (err, connection) {
+                                        
+                    connection.query(query_reco1, function (err, rows_reco1) {
+                    
+                    if (!err) {
+                    
+                                                
+                                } 
+                    else {
+                        
+                        }
+
+                    });
+                   connection.release();
+                    
+                });
+            }
+                 
+        });
+        
+        connection.release();
+                        
+        });
+                    
+        });
+        
+        res.send("The product information has been updated");
+        
+         } 
+         else {
+                    
+            res.send("There was a problem with this action");
+        }
+            
+    });
+     
+     connection.release();     
+	 
+	 });
+	 
+    connection.query(queryfinal,function (err,rows) {           
+	    
+	    if(err) {
+		   
+		    res.send({"There was a problem with this action"});
+	    }
+	    else {
+	    
+	    asin_input.forEach(function(asin)){
+          
+          var query_reco = "SELECT asin_product from recommendations where asin = \'"+ asin +"\';";
+          
+          pool.getConnection(function (err, connection) {
+          
+            connection.query(query_reco, function (err, rows_reco) {
+            
+                if (!err) {
+                  var value = "";
+                  
+                  if (!rows_reco[0] === undefined) {
+                  
+                     value = rows2[0].asin_product;
+                        
+                  }
+
+                  asin_input.forEach(function(row) {
+                  
+                    value += row + ",";
+                        
+                    });
+
+                   value = value.substring(0, value.length - 1);
+                        
+                   var query_reco1 = "REPLACE into recommendations VALUES (\'" + asin + "\',\'" + value + "\');";
+
+                        pool.getConnection(function (err, connection) {
+                        
+                        connection.query(query_reco1, function (err, rows_reco1) {
+                        if (!err) {
+                                    
+                                  }
+                        else {
+                            console.log(err);
+                             }
+
+                      });
+                     connection.release();
+                    });
+                }
+
+            });
+            connection.release();
+                           
+          });
+          
+	    });
+        res.send("The product information has been updated");
+	    
+	    }
+});
+
+/* purchase products */
+
+app.post('/productsPurchased',function(req,res){
+
+var unanme = req.body.username;
+
+user_ses = req.session;
+  var id = req.sessionID;
+  var username = user_ses.user;
+  var type = user_ses.type;
+
+    if (username) {
+    
+        if (type == 'admin') {
+        
+            var query = "SELECT B.uname,count(A.asin_product) as Quantity from orders A, products B where username = " + name + " and A.asin_product = B.asin group by A.asin_product"
+            
+            pool.getConnection(function (err, connection) {
+            
+                connection.query(query, function(err, rows) {
+                
+                    if (err) {
+                    
+                        res.json({"message": "There was a problem with this action"});
+                    }
+                    
+                    if (rows.length > 0) {
+                    
+                        res.json({"products_purchased": rows});
+                        
+                    } else {
+                    
+                        res.json({"products_purchased": "no products"});
+                    }
+                });
+                
+                connection.release();
+            });
+            
+        } 
+        else {
+        
+            res.json({"message": "Only admin can perform this action"});
+        }
+        
+    } 
+    else {
+    
+        res.json({"message": "You must be logged in to perform this action"});
+    }
+
+});
+
+/*get recommendations */
+
+app.post ('/getRecommendations',function(req,res){
+
+var asin_input = req.body.asin;
+
+user_ses = req.session;
+  var id = req.sessionID;
+  var username = user_ses.user;
+  var type = user_ses.type;
+  
+  if (username) {
+  
+        if (type == 'admin') {
+        
+            var query = "SELECT asin_product FROM recommendations WHERE asin=" + asin;
+
+            pool.getConnection(function (err, connection) {
+            
+                connection.query(query, function (err, rows) {
+                
+                    if (err) {
+                    
+                        res.json({"message": "There was a problem with this action"});
+                    }
+                    
+                    if (rows.length > 0) {
+                    
+                        var asins = '"' + rows[0].asin_product.replace(',', '","') + '"';
+                        
+                        var query_name = "SELECT name FROM products where asin in (" + asins + ")";
+                        
+                        pool.getConnection(function (err, connection) {
+                        
+                            connection.query(query_name, function (err, rows_name) {
+                            
+                                if (!err) {
+                                /* do nothing */
+                                } else {
+                                
+                                    res.json({"recommendations": rows_name});
+                                }
+                                
+                            });
+                            connection.release();
+                        });
+
+                    } else {
+                    
+                        res.json({"recommendations": "no products"});
+                    }
+                    
+                });
+                
+                connection.release();
+            });
+            
+        } 
+        else {
+        
+            res.json({"message": "Only admin can perform this action"});
+        }
+    } 
+    else {
+    
+        res.json({"message": "You must be logged in to perform this action"});
+    }
+
+});
+
+
 
  /* add function */ 
   app.post('/add',function(req,res){
